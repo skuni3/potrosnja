@@ -69,6 +69,8 @@
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   td.opis { white-space: normal; }
   .msg { text-align: center; padding: 32px 16px; }
+  .gumb { margin-top: 14px; font: inherit; font-weight: 600; color: #fff; background: #8e4fc0; border: 0; border-radius: 12px; padding: 10px 18px; cursor: pointer; }
+  .obavijest { max-width: 520px; margin: 0 auto 12px; padding: 8px 12px; border-radius: 12px; background: rgba(60, 20, 30, .92); color: #ffd2d2; font-size: 13px; text-align: center; box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
 
   /* ---------- HOME ---------- */
   .top { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 2px 12px; }
@@ -177,6 +179,7 @@
 </head>
 <body>
 <div class="pozadina" aria-hidden="true"></div>
+<div class="obavijest" id="obavijest" role="status" hidden></div>
 <main id="app">
   <div class="card msg muted">Učitavam…</div>
 </main>
@@ -286,7 +289,12 @@ async function dohvatiCSV() {
   const url = CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "_=" + Date.now();
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("HTTP " + res.status);
-  return res.text();
+  const tekst = await res.text();
+  // Neobjavljen Sheet: Google vrati web-stranicu (HTML) s 200 OK, ne CSV.
+  const zaglavlje = tekst.replace(/^﻿/, "").split(/\r?\n/, 1)[0].toLowerCase();
+  if (tekst.trimStart().startsWith("<") || !zaglavlje.includes("iznos"))
+    throw new Error("Link ne vraća CSV tablicu troškova — je li Sheet još objavljen (Publish to web → CSV)?");
+  return tekst;
 }
 
 // ============================================================
@@ -501,6 +509,8 @@ const BOJE = {
 const bojaZa = naziv => BOJE[naziv] || "var(--c-ostalo)";
 
 // 1 dan, 2 dana, 5 dana, 21 dan, 11 dana
+// 1 neispravan red, 3 neispravna reda, 7 neispravnih redova
+const redova = n => n + (n % 10 === 1 && n % 100 !== 11 ? " neispravan red" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? " neispravna reda" : " neispravnih redova");
 const dana = n => n + (n % 10 === 1 && n % 100 !== 11 ? " dan" : " dana");
 
 function krug(ukupno) {
@@ -1096,9 +1106,21 @@ function postaviTabbar(animiraj = true) {
   TB.kraj = setTimeout(() => { cancelAnimationFrame(TB.anim); TB.x = cilj; crtaj(cilj); }, trajanje + 80);
 }
 
-function poruka(tekst, detalj) {
+function poruka(tekst, detalj, ponovno = false) {
   document.getElementById("app").innerHTML =
-    `<div class="card msg"><div class="err">${esc(tekst)}</div>${detalj ? `<p class="muted">${esc(detalj)}</p>` : ""}</div>`;
+    `<div class="card msg"><div class="err">${esc(tekst)}</div>${detalj ? `<p class="muted">${esc(detalj)}</p>` : ""}` +
+    (ponovno ? `<button class="gumb" id="ponovno">Pokušaj ponovno</button>` : "") + `</div>`;
+  if (ponovno) document.getElementById("ponovno").addEventListener("click", () => {
+    document.getElementById("app").innerHTML = `<div class="card msg muted">Učitavam…</div>`;
+    start();
+  });
+}
+
+// Mala obavijest na vrhu kad osvježavanje ne uspije, a stari podaci ostaju na ekranu.
+function obavijest(tekst) {
+  const el = document.getElementById("obavijest");
+  el.textContent = tekst || "";
+  el.hidden = !tekst;
 }
 
 function redTroska(t) {
@@ -1193,7 +1215,7 @@ function prikazi() {
   if (!podaci) return;
   const { troskovi, preskoceno } = podaci;
   try {
-    if (!troskovi.length) return poruka("Još nema troškova u Sheetu.", preskoceno.length ? `Preskočeno ${preskoceno.length} neispravnih redova.` : "");
+    if (!troskovi.length) return poruka("Još nema troškova u Sheetu.", preskoceno.length ? `Preskočeno: ${redova(preskoceno.length)}.` : "");
     const danas = danasnjiDatum();
     // ?debug=1 → ispis za provjeru čitanja i ciklusa (Faze 1–2)
     if (new URLSearchParams(location.search).has("debug")) prikaziDokaz(troskovi, preskoceno, danas);
@@ -1211,13 +1233,18 @@ async function start() {
   try {
     tekst = await dohvatiCSV();
   } catch (e) {
-    return poruka("Ne mogu dohvatiti podatke iz Sheeta.", "Provjeri internet vezu i pokušaj ponovno. (" + e.message + ")");
+    // Već imamo podatke (osvježavanje pri povratku u app) → ostavi ih na ekranu, samo javi.
+    if (podaci) return obavijest("Nije osvježeno (nema veze?) — prikazani su zadnji učitani podaci.");
+    const mreza = e instanceof TypeError; // fetch baca TypeError kad nema mreže
+    return poruka("Ne mogu dohvatiti podatke iz Sheeta.",
+      mreza ? "Provjeri internet vezu i pokušaj ponovno." : e.message, true);
   }
   try {
     podaci = ucitajTroskove(tekst);
   } catch (e) {
-    return poruka("Greška pri obradi podataka.", e.message);
+    return poruka("Greška pri obradi podataka.", e.message, true);
   }
+  obavijest("");
   prikazi();
 }
 

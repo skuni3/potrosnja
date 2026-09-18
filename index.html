@@ -130,6 +130,17 @@
   .seg-toggle { display: inline-flex; background: var(--track); border-radius: 9px; padding: 2px; }
   .seg-toggle button { border: 0; background: transparent; font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 7px; color: var(--muted); cursor: pointer; }
   .seg-toggle button.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  /* ---------- CUSTOM (funkcionalno; polish je Faza 6) ---------- */
+  .datumi { display: flex; gap: 12px; flex-wrap: wrap; }
+  .datumi label { flex: 1 1 130px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  /* ≥16px da iOS ne zumira ekran pri tapu na polje */
+  .datumi input { font: inherit; font-size: 16px; color: var(--text); padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); min-height: 42px; width: 100%; }
+  .big-num { font-size: 52px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+  .big-num small { font-size: 22px; font-weight: 600; color: var(--muted); margin-left: 2px; }
+  .tr-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .tr-row + .tr-row { border-top: 1px solid var(--line); }
+  .tr-info { flex: 1; min-width: 0; }
+  .tr-row b { white-space: nowrap; font-variant-numeric: tabular-nums; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
 </style>
 </head>
@@ -380,6 +391,16 @@ function usporedbaCiklusa(troskovi, danas) {
       };
     }),
   };
+}
+
+// ---------- CUSTOM RASPON (spec 7) ----------
+
+// Troškovi od datuma "od" (00:00) do datuma "do" UKLJUČIVO (cijeli dan), sortirano po vremenu.
+// Namjerno drukčije od ciklusa (kraj isključiv) — ovo je ljudski raspon "od ovog do ovog dana".
+function troskoviOdDo(troskovi, od, doDatum) {
+  const start = new Date(od.getFullYear(), od.getMonth(), od.getDate());
+  const kraj = new Date(doDatum.getFullYear(), doDatum.getMonth(), doDatum.getDate() + 1);
+  return uRasponu(troskovi, start, kraj);
 }
 
 // Dnevne sume tekućeg ciklusa (spec 5.6): jedan element po danu ciklusa.
@@ -828,10 +849,81 @@ function prikaziGrafovi(troskovi, danas) {
   crtajPregled();
 }
 
+// ---------- CUSTOM RASPON (spec 7) ----------
+
+// "2026-09-18" ↔ Date (lokalno), za <input type="date">
+const uIso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+let raspon = null; // { od, do } — pamti se samo dok je app otvorena (bez storage-a)
+
+function prikaziCustom(troskovi, danas) {
+  // Zadano: od početka tekućeg ciklusa do danas.
+  if (!raspon) raspon = { od: uIso(ciklusZa(danas).start), do: uIso(danas) };
+
+  document.getElementById("app").innerHTML = `
+    ${nav("custom")}
+    <div class="top"><h1>Custom raspon</h1></div>
+
+    <div class="card">
+      <div class="datumi">
+        <label>od<input type="date" id="r-od" value="${raspon.od}"></label>
+        <label>do<input type="date" id="r-do" value="${raspon.do}"></label>
+      </div>
+      <p class="muted" style="margin:8px 0 0">Oba datuma su uključena (cijeli dan).</p>
+    </div>
+
+    <div id="r-rez"></div>
+  `;
+
+  const crtaj = () => {
+    const od = parseTimestamp(raspon.od), doD = parseTimestamp(raspon.do);
+    const rez = document.getElementById("r-rez");
+    if (!od || !doD) { rez.innerHTML = `<div class="card"><p class="muted">Odaberi oba datuma.</p></div>`; return; }
+    if (od > doD) { rez.innerHTML = `<div class="card"><p class="err">Datum "od" je nakon datuma "do".</p></div>`; return; }
+
+    const lista = troskoviOdDo(troskovi, od, doD);
+    const ukupno = zbroj(lista);
+    const brojDana = danIndeks(doD) - danIndeks(od) + 1;
+    const kat = poKategoriji(lista).filter(k => k.iznos > 0).sort((a, b) => b.iznos - a.iznos);
+
+    rez.innerHTML = `
+      <div class="card hero">
+        <div class="big-num">${Math.round(ukupno).toLocaleString("hr-HR")}<small>€</small></div>
+        <div class="sub">${datumKratko(od)}${od.getFullYear()}. – ${datumKratko(doD)}${doD.getFullYear()}. · ${dana(brojDana)} · ${lista.length} troškova</div>
+      </div>
+
+      ${lista.length ? `
+      <div class="card">
+        <h2>Po kategoriji</h2>
+        ${kat.map(k => `
+          <div class="kv"><span><i class="dot" style="background:${bojaZa(k.naziv)}"></i>${k.emoji} ${esc(k.naziv)}</span>
+            <b>${eur(k.iznos)} <span class="muted">· ${Math.round((k.iznos / ukupno) * 100)} %</span></b></div>`).join("")}
+      </div>
+
+      <div class="card">
+        <h2>Svi troškovi</h2>
+        ${lista.map(t => `
+          <div class="tr-row">
+            <div class="tr-info">
+              <div>${emojiZa(t.kategorija)} ${esc(t.kategorija)}${t.opis ? ` · ${esc(t.opis)}` : ""}</div>
+              <div class="muted">${datumKratko(t.timestamp)} ${DANI_KRATKO[t.timestamp.getDay()]} · ${String(t.timestamp.getHours()).padStart(2, "0")}:${String(t.timestamp.getMinutes()).padStart(2, "0")}</div>
+            </div>
+            <b>${tocno(t.iznos)}</b>
+          </div>`).join("")}
+      </div>` : `<div class="card"><p class="muted">Nema troškova u ovom rasponu.</p></div>`}
+    `;
+  };
+
+  ["od", "do"].forEach(k => document.getElementById("r-" + k).addEventListener("change", e => {
+    raspon[k] = e.target.value;
+    crtaj();
+  }));
+  crtaj();
+}
+
 // Privremena navigacija (bez dizajna) — pravi donji tab-bar je Faza 6.
 function nav(aktivna) {
   const l = (id, tekst) => id === aktivna ? `<b>${tekst}</b>` : `<a href="#${id}">${tekst}</a>`;
-  return `<nav class="tmpnav">${l("home", "Home")} · ${l("grafovi", "Grafovi")}</nav>`;
+  return `<nav class="tmpnav">${l("home", "Home")} · ${l("grafovi", "Grafovi")} · ${l("custom", "Custom")}</nav>`;
 }
 
 function poruka(tekst, detalj) {
@@ -936,6 +1028,7 @@ function prikazi() {
     // ?debug=1 → ispis za provjeru čitanja i ciklusa (Faze 1–2)
     if (new URLSearchParams(location.search).has("debug")) prikaziDokaz(troskovi, preskoceno, danas);
     else if (location.hash === "#grafovi") prikaziGrafovi(troskovi, danas);
+    else if (location.hash === "#custom") prikaziCustom(troskovi, danas);
     else prikaziHome(troskovi, danas);
     window.scrollTo(0, 0);
   } catch (e) {

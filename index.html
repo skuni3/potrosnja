@@ -109,6 +109,28 @@
   .top3 .info .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .top3 .amt { font-size: 20px; font-weight: 700; white-space: nowrap; }
   .foot { text-align: center; margin-top: 6px; }
+
+  /* ---------- GRAFOVI (funkcionalno; polish je Faza 6) ---------- */
+  :root { --axis: #c3c7cf; }
+  .tmpnav { font-size: 14px; color: var(--muted); margin: 0 2px 8px; }
+  .tmpnav a { color: #2a78d6; text-decoration: none; }
+  .chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .chart .ax { font-size: 10px; fill: var(--muted); }
+  .chart .ax.cur { fill: var(--text); font-weight: 700; }
+  .chart .val { font-size: 10px; fill: var(--text); font-weight: 600; }
+  .chart .grp { cursor: pointer; transition: opacity .2s; }
+  .chart .grp.dim { opacity: .3; }
+  .detail { min-height: 22px; margin-top: 6px; font-size: 14px; }
+  .isti { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
+  .key { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .key .kk { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--text); margin-right: 6px; vertical-align: -1px; }
+  .key .kk.faint { opacity: .35; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .card-head h2 { margin: 0; }
+  .seg-toggle { display: inline-flex; background: var(--track); border-radius: 9px; padding: 2px; }
+  .seg-toggle button { border: 0; background: transparent; font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 7px; color: var(--muted); cursor: pointer; }
+  .seg-toggle button.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
 </style>
 </head>
 <body>
@@ -309,6 +331,73 @@ function topTroskovi(troskovi, n) {
   return troskovi.slice().sort((a, b) => b.iznos - a.iznos || b.timestamp - a.timestamp).slice(0, n);
 }
 
+// ---------- POVIJEST (spec 6) ----------
+
+// Ciklus je "stvaran" tek od ciklusa prvog troška u Sheetu — raniji se prikazuju kao prazno, ne kao 0 €.
+function imaPodatke(troskovi, c) {
+  return troskovi.length > 0 && c.start >= ciklusZa(troskovi[0].timestamp).start;
+}
+
+// Zadnjih n ciklusa unatrag od danas (klizno, uklj. tekući), najstariji prvi — spec 6.4.
+function zadnjihCiklusa(troskovi, danas, n) {
+  const tekuci = ciklusZa(danas);
+  const out = [];
+  for (let c = tekuci, i = 0; i < n; i++, c = prethodniCiklus(c)) {
+    out.unshift({
+      ciklus: c,
+      iznos: zbroj(uRasponu(troskovi, c.start, c.end)),
+      uTijeku: c.start.getTime() === tekuci.start.getTime(),
+      imaPodatke: imaPodatke(troskovi, c),
+    });
+  }
+  return out;
+}
+
+// Zatvoreni (prošli) ciklusi s podacima, najnoviji prvi — spec 6.1.
+function zatvoreniCiklusi(troskovi, danas) {
+  const tekuci = ciklusZa(danas);
+  return sviCiklusi(troskovi, danas)
+    .filter(c => c.start < tekuci.start)
+    .reverse()
+    .map(c => ({ ciklus: c, iznos: zbroj(uRasponu(troskovi, c.start, c.end)) }));
+}
+
+// Tekući vs prošli po kategoriji — spec 6.3. prosli = null ako prošli ciklus nema podataka.
+function usporedbaCiklusa(troskovi, danas) {
+  const c = ciklusZa(danas), p = prethodniCiklus(c);
+  const sada = poKategoriji(uRasponu(troskovi, c.start, c.end));
+  const imaProsli = imaPodatke(troskovi, p);
+  const prije = imaProsli ? poKategoriji(uRasponu(troskovi, p.start, p.end)) : [];
+  const nazivi = [...new Set([...sada, ...prije].map(k => k.naziv))];
+  return {
+    tekuci: c, prosli: imaProsli ? p : null,
+    kategorije: nazivi.map(n => {
+      const k = [...KATEGORIJE, OSTALO].find(x => x.naziv === n);
+      return {
+        ...k,
+        sada: (sada.find(x => x.naziv === n) || { iznos: 0 }).iznos,
+        prije: imaProsli ? (prije.find(x => x.naziv === n) || { iznos: 0 }).iznos : null,
+      };
+    }),
+  };
+}
+
+// "Isti dan prošlog ciklusa" = isti BROJ DANA od početka ciklusa (spec 6.3).
+// Dan N tekućeg (danas uklj.) ↔ dani 1..N prošlog; ako je prošli kraći, uzima se cijeli.
+function istiDanProslog(troskovi, danas) {
+  const c = ciklusZa(danas), p = prethodniCiklus(c);
+  if (!imaPodatke(troskovi, p)) return null;
+  const dan = protekloDana(c, danas);
+  const granica = new Date(Math.min(
+    new Date(p.start.getFullYear(), p.start.getMonth(), p.start.getDate() + dan).getTime(), p.end.getTime()));
+  return {
+    dan,
+    prosli: p,
+    prije: zbroj(uRasponu(troskovi, p.start, granica)),
+    sada: zbroj(uRasponu(troskovi, c.start, c.end)),
+  };
+}
+
 // ============================================================
 // PRIKAZ
 // ============================================================
@@ -443,6 +532,7 @@ function prikaziHome(troskovi, danas) {
   const sad = new Date();
 
   document.getElementById("app").innerHTML = `
+    ${nav("home")}
     <div class="top">
       <h1>${oznakaCiklusa(c)}</h1>
       <span class="muted">${datumKratko(c.start)} – ${datumKratko(new Date(c.end.getFullYear(), c.end.getMonth(), c.end.getDate() - 1))}</span>
@@ -471,6 +561,183 @@ function prikaziHome(troskovi, danas) {
     <p class="muted foot">ažurirano ${String(sad.getHours()).padStart(2, "0")}:${String(sad.getMinutes()).padStart(2, "0")}</p>
   `;
   if (d) d.spoji();
+}
+
+// ---------- GRAFOVI (spec 6) ----------
+
+const MJ_KRATKO = ["sij", "velj", "ožu", "tra", "svi", "lip", "srp", "kol", "ruj", "lis", "stu", "pro"];
+const bojaStatusa = s => ({ ok: "var(--green)", warn: "var(--yellow)", over: "var(--red)" })[s];
+
+// Okrugli vrh osi: 1, 2, 2.5, 5 × 10^n
+function lijepiMax(v) {
+  if (v <= 0) return 10;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  return [1, 2, 2.5, 5, 10].map(m => m * p).find(x => x >= v);
+}
+
+// Stupac zaobljen samo na vrhu (4px), ravan na bazi.
+function stupac(x, y, w, h, boja, extra = "") {
+  if (h <= 0) return "";
+  const r = Math.min(4, w / 2, h);
+  return `<path d="M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z" fill="${boja}" ${extra}/>`;
+}
+
+// Horizontalne linije mreže + oznake osi Y (0, pola, vrh).
+function mreza(W, top, bot, max, left) {
+  return [0, max / 2, max].map(v => {
+    const y = bot - (v / max) * (bot - top);
+    return `<line x1="${left}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/>
+      <text x="${left - 4}" y="${y + 3}" text-anchor="end" class="ax">${Math.round(v)}</text>`;
+  }).join("");
+}
+
+// 6.3 — tekući vs prošli, vertikalni stupci po kategoriji (boje identiteta).
+function grafUsporedba(u) {
+  const W = 340, H = 190, L = 30, top = 10, bot = 160;
+  const kat = u.kategorije;
+  const max = lijepiMax(Math.max(1, ...kat.map(k => Math.max(k.sada, k.prije || 0))));
+  const gw = (W - L) / kat.length, bw = Math.min(14, (gw - 10) / 2);
+  const y = v => bot - (v / max) * (bot - top);
+  const grupe = kat.map((k, i) => {
+    const cx = L + gw * i + gw / 2;
+    const prosli = u.prosli ? stupac(cx - bw - 1, y(k.prije), bw, bot - y(k.prije), bojaZa(k.naziv), 'fill-opacity="0.35"') : "";
+    const tekuci = stupac(u.prosli ? cx + 1 : cx - bw / 2, y(k.sada), bw, bot - y(k.sada), bojaZa(k.naziv));
+    return `<g class="grp" data-i="${i}">
+      <rect x="${L + gw * i}" y="0" width="${gw}" height="${H}" fill="transparent"/>
+      ${prosli}${tekuci}
+      <text x="${cx}" y="${bot + 20}" text-anchor="middle" font-size="14">${k.emoji}</text>
+    </g>`;
+  }).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}">${mreza(W, top, bot, max, L)}
+    <line x1="${L}" x2="${W}" y1="${bot}" y2="${bot}" stroke="var(--axis)" stroke-width="1"/>${grupe}</svg>`;
+}
+
+// 6.4 (+ 6.2) — zadnjih N ciklusa: stupac = suma ciklusa (status prema pragu), trend kroz zatvorene.
+function grafPregled(niz) {
+  const W = 340, H = 200, L = 34, top = 18, bot = 170;
+  const max = lijepiMax(Math.max(UKUPNI_PRAG, ...niz.map(c => c.iznos)));
+  const sw = (W - L) / niz.length, bw = Math.min(24, sw * 0.6);
+  const y = v => bot - (v / max) * (bot - top);
+  const cx = i => L + sw * i + sw / 2;
+  const trend = niz.map((c, i) => ({ c, i })).filter(({ c }) => c.imaPodatke && !c.uTijeku);
+  const stupci = niz.map((c, i) => {
+    const boja = bojaStatusa(statusUkupno(c.iznos));
+    const oznaka = niz.length <= 6 && c.imaPodatke
+      ? `<text x="${cx(i)}" y="${y(c.iznos) - 10}" text-anchor="middle" class="val">${Math.round(c.iznos)}</text>` : "";
+    const tijelo = c.imaPodatke
+      ? stupac(cx(i) - bw / 2, y(c.iznos), bw, bot - y(c.iznos), boja, c.uTijeku ? 'fill-opacity="0.4"' : "")
+      : `<rect x="${cx(i) - bw / 2}" y="${bot - 3}" width="${bw}" height="3" rx="1.5" fill="var(--track)"/>`;
+    return `<g class="grp" data-i="${i}">
+      <rect x="${L + sw * i}" y="0" width="${sw}" height="${H}" fill="transparent"/>
+      ${tijelo}${oznaka}
+      <text x="${cx(i)}" y="${bot + 16}" text-anchor="middle" class="ax ${c.uTijeku ? "cur" : ""}">${MJ_KRATKO[c.ciklus.start.getMonth()]}</text>
+    </g>`;
+  }).join("");
+  const linija = trend.length >= 2
+    ? `<polyline points="${trend.map(({ c, i }) => `${cx(i)},${y(c.iznos)}`).join(" ")}" fill="none" stroke="var(--text)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"/>` +
+      trend.map(({ c, i }) => `<circle cx="${cx(i)}" cy="${y(c.iznos)}" r="4" fill="var(--text)" stroke="var(--card)" stroke-width="2" pointer-events="none"/>`).join("")
+    : "";
+  const prag = `<line x1="${L}" x2="${W}" y1="${y(UKUPNI_PRAG)}" y2="${y(UKUPNI_PRAG)}" stroke="var(--red)" stroke-width="1" stroke-opacity="0.5"/>
+    <text x="${W}" y="${y(UKUPNI_PRAG) - 4}" text-anchor="end" class="ax">prag ${UKUPNI_PRAG}</text>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}">${mreza(W, top, bot, max, L)}${prag}
+    <line x1="${L}" x2="${W}" y1="${bot}" y2="${bot}" stroke="var(--axis)" stroke-width="1"/>${stupci}${linija}</svg>`;
+}
+
+// Tap na grupu stupaca → redak s detaljem ispod grafa; ponovni tap → zadani tekst.
+function spojiTap(svgWrap, detalj, tekstZa, zadano) {
+  let sel = null;
+  const prikazi = () => {
+    detalj.innerHTML = sel == null ? zadano : tekstZa(sel);
+    svgWrap.querySelectorAll(".grp").forEach(g => g.classList.toggle("dim", sel != null && +g.dataset.i !== sel));
+  };
+  svgWrap.querySelectorAll(".grp").forEach(g => g.addEventListener("click", () => {
+    sel = sel === +g.dataset.i ? null : +g.dataset.i;
+    prikazi();
+  }));
+  prikazi();
+}
+
+let pregledN = 6; // toggle 6 / 12 ciklusa (samo u memoriji)
+
+function prikaziGrafovi(troskovi, danas) {
+  const u = usporedbaCiklusa(troskovi, danas);
+  const isti = istiDanProslog(troskovi, danas);
+  const zatvoreni = zatvoreniCiklusi(troskovi, danas);
+  const oz = c => oznakaCiklusa(c);
+
+  const istiHtml = isti
+    ? (() => {
+        const razlika = isti.sada - isti.prije;
+        return `<p class="isti">Na <b>${isti.dan}. dan</b> prošlog ciklusa (${oz(isti.prosli)}) bio si na <b>${eur(isti.prije)}</b>, sad si na <b>${eur(isti.sada)}</b>.
+          <span class="muted">${Math.abs(razlika) < 0.5 ? "Isti tempo." : razlika > 0 ? `${eur(razlika)} više nego tada.` : `${eur(-razlika)} manje nego tada.`}</span></p>`;
+      })()
+    : `<p class="muted">"Isti dan prošlog ciklusa" radi kad postoji pun prošli ciklus — od ${datumKratko(ciklusZa(danas).end)} nadalje.</p>`;
+
+  document.getElementById("app").innerHTML = `
+    ${nav("grafovi")}
+    <div class="top"><h1>Grafovi</h1></div>
+
+    <div class="card">
+      <h2>${u.prosli ? `${oz(u.tekuci)} vs ${oz(u.prosli)}` : `${oz(u.tekuci)} po kategorijama`}</h2>
+      ${u.prosli ? `<div class="key"><span><i class="kk"></i>${oz(u.tekuci)}</span><span><i class="kk faint"></i>${oz(u.prosli)}</span></div>`
+                 : `<p class="muted">Još nema prošlog ciklusa za usporedbu — prikazan je samo tekući.</p>`}
+      <div id="g-usp">${grafUsporedba(u)}</div>
+      <div class="detail" id="g-usp-d"></div>
+      ${istiHtml}
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Pregled</h2>
+        <div class="seg-toggle" id="pregled-toggle">
+          <button data-n="6" class="${pregledN === 6 ? "on" : ""}">6 ciklusa</button>
+          <button data-n="12" class="${pregledN === 12 ? "on" : ""}">12 ciklusa</button>
+        </div>
+      </div>
+      <div id="g-pre"></div>
+      <div class="detail" id="g-pre-d"></div>
+      <p class="muted" id="g-pre-note"></p>
+    </div>
+
+    <div class="card">
+      <h2>Prošli ciklusi</h2>
+      ${zatvoreni.length
+        ? zatvoreni.map(z => `<div class="kv"><span><i class="dot" style="background:${bojaStatusa(statusUkupno(z.iznos))}"></i>${oz(z.ciklus)} <span class="muted">${datumKratko(z.ciklus.start)}–${datumKratko(new Date(z.ciklus.end.getFullYear(), z.ciklus.end.getMonth(), z.ciklus.end.getDate() - 1))}</span></span><b>${eur(z.iznos)}</b></div>`).join("")
+        : `<p class="muted">Još nema zatvorenih ciklusa. Prvi se zatvara ${datumKratko(ciklusZa(danas).end)}</p>`}
+    </div>
+  `;
+
+  spojiTap(document.getElementById("g-usp"), document.getElementById("g-usp-d"), i => {
+    const k = u.kategorije[i];
+    return `${k.emoji} ${esc(k.naziv)}: <b>${eur(k.sada)}</b>${k.prije != null ? ` <span class="muted">· prošli ${eur(k.prije)}</span>` : ""}${k.limit != null ? ` <span class="muted">· limit ${k.limit}</span>` : ""}`;
+  }, `<span class="muted">Tapni kategoriju za iznose.</span>`);
+
+  const crtajPregled = () => {
+    const niz = zadnjihCiklusa(troskovi, danas, pregledN);
+    document.getElementById("g-pre").innerHTML = grafPregled(niz);
+    const zatv = niz.filter(c => c.imaPodatke && !c.uTijeku).length;
+    document.getElementById("g-pre-note").textContent = zatv >= 2
+      ? "Linija = trend zatvorenih ciklusa. Blijedi stupac = tekući ciklus (u tijeku)."
+      : `Trend linija se pojavljuje kad budu barem 2 zatvorena ciklusa (sad: ${zatv}). Blijedi stupac = tekući ciklus (u tijeku).`;
+    spojiTap(document.getElementById("g-pre"), document.getElementById("g-pre-d"), i => {
+      const c = niz[i];
+      return c.imaPodatke
+        ? `${oz(c.ciklus)}: <b>${eur(c.iznos)}</b>${c.uTijeku ? ' <span class="muted">· u tijeku</span>' : ""}`
+        : `${oz(c.ciklus)}: <span class="muted">nema podataka</span>`;
+    }, `<span class="muted">Tapni stupac za iznos.</span>`);
+    document.querySelectorAll("#pregled-toggle button").forEach(b => b.classList.toggle("on", +b.dataset.n === pregledN));
+  };
+  document.querySelectorAll("#pregled-toggle button").forEach(b => b.addEventListener("click", () => {
+    pregledN = +b.dataset.n;
+    crtajPregled();
+  }));
+  crtajPregled();
+}
+
+// Privremena navigacija (bez dizajna) — pravi donji tab-bar je Faza 6.
+function nav(aktivna) {
+  const l = (id, tekst) => id === aktivna ? `<b>${tekst}</b>` : `<a href="#${id}">${tekst}</a>`;
+  return `<nav class="tmpnav">${l("home", "Home")} · ${l("grafovi", "Grafovi")}</nav>`;
 }
 
 function poruka(tekst, detalj) {
@@ -556,6 +823,25 @@ function prikaziDokaz(troskovi, preskoceno, danas) {
   `;
 }
 
+let podaci = null; // zadnje učitano: { troskovi, preskoceno }
+
+// Crta stranicu iz adrese (#grafovi …) nad već učitanim podacima — bez novog fetcha.
+function prikazi() {
+  if (!podaci) return;
+  const { troskovi, preskoceno } = podaci;
+  try {
+    if (!troskovi.length) return poruka("Još nema troškova u Sheetu.", preskoceno.length ? `Preskočeno ${preskoceno.length} neispravnih redova.` : "");
+    const danas = danasnjiDatum();
+    // ?debug=1 → ispis za provjeru čitanja i ciklusa (Faze 1–2)
+    if (new URLSearchParams(location.search).has("debug")) prikaziDokaz(troskovi, preskoceno, danas);
+    else if (location.hash === "#grafovi") prikaziGrafovi(troskovi, danas);
+    else prikaziHome(troskovi, danas);
+    window.scrollTo(0, 0);
+  } catch (e) {
+    poruka("Greška pri obradi podataka.", e.message);
+  }
+}
+
 async function start() {
   let tekst;
   try {
@@ -564,18 +850,16 @@ async function start() {
     return poruka("Ne mogu dohvatiti podatke iz Sheeta.", "Provjeri internet vezu i pokušaj ponovno. (" + e.message + ")");
   }
   try {
-    const { troskovi, preskoceno } = ucitajTroskove(tekst);
-    if (!troskovi.length) return poruka("Još nema troškova u Sheetu.", preskoceno.length ? `Preskočeno ${preskoceno.length} neispravnih redova.` : "");
-    // ?debug=1 → ispis za provjeru čitanja i ciklusa (Faze 1–2)
-    if (new URLSearchParams(location.search).has("debug")) prikaziDokaz(troskovi, preskoceno, danasnjiDatum());
-    else prikaziHome(troskovi, danasnjiDatum());
+    podaci = ucitajTroskove(tekst);
   } catch (e) {
-    poruka("Greška pri obradi podataka.", e.message);
+    return poruka("Greška pri obradi podataka.", e.message);
   }
+  prikazi();
 }
 
 if (typeof document !== "undefined") {
   start();
+  window.addEventListener("hashchange", prikazi);
   // Home-screen app na iOS-u se ne učitava ponovno pri povratku — osvježi podatke kad se vrati u prvi plan.
   let skriveno = 0;
   document.addEventListener("visibilitychange", () => {

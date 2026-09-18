@@ -131,10 +131,21 @@
   .seg-toggle button { border: 0; background: transparent; font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 7px; color: var(--muted); cursor: pointer; }
   .seg-toggle button.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
   /* ---------- CUSTOM (funkcionalno; polish je Faza 6) ---------- */
-  .datumi { display: flex; gap: 12px; flex-wrap: wrap; }
-  .datumi label { flex: 1 1 130px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
-  /* ≥16px da iOS ne zumira ekran pri tapu na polje */
-  .datumi input { font: inherit; font-size: 16px; color: var(--text); padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); min-height: 42px; width: 100%; }
+  .raspon-btn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; font: inherit; font-size: 16px; font-weight: 600; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; text-align: left; }
+  .raspon-btn.open { border-color: #2a78d6; }
+  .raspon-btn .muted { font-weight: 400; margin-right: 2px; }
+  #r-kal { margin-top: 12px; }
+  .kal-head { display: flex; justify-content: space-between; align-items: center; }
+  .kal-nav { width: 44px; height: 44px; border: 0; background: transparent; font-size: 26px; color: #2a78d6; cursor: pointer; border-radius: 10px; }
+  .kal-hint { text-align: center; font-size: 13px; color: var(--muted); margin: 2px 0 8px; }
+  .kal-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; }
+  .kal-grid .dow { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+  .kal-grid .d { position: relative; height: 42px; border: 0; background: transparent; font: inherit; font-size: 16px; color: var(--text); cursor: pointer; padding: 0; }
+  .kal-grid .d.today { font-weight: 700; }
+  .kal-grid .d.in { background: #dce9fa; }
+  .kal-grid .d.end { background: #2a78d6; color: #fff; font-weight: 700; border-radius: 10px; }
+  .kal-grid .d i { position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--muted); }
+  .kal-grid .d.end i { background: #fff; }
   .big-num { font-size: 52px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
   .big-num small { font-size: 22px; font-weight: 600; color: var(--muted); margin-left: 2px; }
   .tr-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
@@ -864,10 +875,8 @@ function prikaziCustom(troskovi, danas) {
     <div class="top"><h1>Custom raspon</h1></div>
 
     <div class="card">
-      <div class="datumi">
-        <label>od<input type="date" id="r-od" value="${raspon.od}"></label>
-        <label>do<input type="date" id="r-do" value="${raspon.do}"></label>
-      </div>
+      <button class="raspon-btn" id="r-btn"></button>
+      <div id="r-kal" hidden></div>
       <p class="muted" style="margin:8px 0 0">Oba datuma su uključena (cijeli dan).</p>
     </div>
 
@@ -913,11 +922,82 @@ function prikaziCustom(troskovi, danas) {
     `;
   };
 
-  ["od", "do"].forEach(k => document.getElementById("r-" + k).addEventListener("change", e => {
-    raspon[k] = e.target.value;
-    crtaj();
-  }));
+  // Kalendar kao kod letova: tap na raspon → tap početni dan → tap završni dan → zatvori se.
+  const btn = document.getElementById("r-btn"), kalEl = document.getElementById("r-kal");
+  const daniSTroskom = new Set(troskovi.map(t => uIso(t.timestamp)));
+  const kratko = iso => { const d = parseTimestamp(iso); return `${datumKratko(d)}${d.getFullYear()}.`; };
+  let prvi = null, mjesec = null;
+
+  const crtajGumb = () => {
+    btn.innerHTML = `<span><span class="muted">od</span> ${kratko(raspon.od)}</span><span class="muted">→</span><span><span class="muted">do</span> ${kratko(raspon.do)}</span>`;
+    btn.classList.toggle("open", !kalEl.hidden);
+  };
+  const crtajKal = () => {
+    const y = mjesec.getFullYear(), m = mjesec.getMonth();
+    const danasIso = uIso(danas);
+    const cell = iso => {
+      if (!iso) return `<span></span>`;
+      const od = prvi || raspon.od, doI = prvi || raspon.do;
+      const cls = [
+        iso === od || iso === doI ? "end" : iso > od && iso < doI ? "in" : "",
+        iso === danasIso ? "today" : "",
+      ].join(" ");
+      return `<button class="d ${cls}" data-iso="${iso}">${+iso.slice(8)}${daniSTroskom.has(iso) ? "<i></i>" : ""}</button>`;
+    };
+    kalEl.innerHTML = `
+      <div class="kal-head">
+        <button class="kal-nav" data-m="-1" aria-label="prethodni mjesec">‹</button>
+        <b>${MJESECI[m]} ${y}</b>
+        <button class="kal-nav" data-m="1" aria-label="sljedeći mjesec">›</button>
+      </div>
+      <div class="kal-hint">${prvi ? `od <b>${kratko(prvi)}</b> — sad odaberi završni dan` : "Odaberi početni dan"}</div>
+      <div class="kal-grid">
+        ${["pon", "uto", "sri", "čet", "pet", "sub", "ned"].map(d => `<span class="dow">${d}</span>`).join("")}
+        ${kalendarMjesec(y, m).flat().map(cell).join("")}
+      </div>`;
+    kalEl.querySelectorAll(".kal-nav").forEach(b => b.addEventListener("click", () => {
+      mjesec = new Date(y, m + +b.dataset.m, 1);
+      crtajKal();
+    }));
+    kalEl.querySelectorAll(".d").forEach(b => b.addEventListener("click", () => {
+      const r = klikKalendar(prvi, b.dataset.iso);
+      prvi = r.prvi;
+      if (r.gotovo) {
+        raspon = r.gotovo;
+        kalEl.hidden = true;
+        crtaj();
+        crtajGumb();
+      } else crtajKal();
+    }));
+  };
+
+  btn.addEventListener("click", () => {
+    kalEl.hidden = !kalEl.hidden;
+    prvi = null; // zatvaranje bez drugog tapa = odustani, raspon ostaje stari
+    if (!kalEl.hidden) {
+      const d = parseTimestamp(raspon.do);
+      mjesec = new Date(d.getFullYear(), d.getMonth(), 1);
+      crtajKal();
+    }
+    crtajGumb();
+  });
+  crtajGumb();
   crtaj();
+}
+
+// Mjesec kao tjedni (pon → ned), prazna mjesta = null. Elementi: "yyyy-mm-dd".
+function kalendarMjesec(y, m) {
+  const pomak = (new Date(y, m, 1).getDay() + 6) % 7; // pon = 0
+  const dana = new Date(y, m + 1, 0).getDate();
+  const polja = [...Array(pomak).fill(null), ...Array.from({ length: dana }, (_, i) => uIso(new Date(y, m, i + 1)))];
+  while (polja.length % 7) polja.push(null);
+  return Array.from({ length: polja.length / 7 }, (_, i) => polja.slice(i * 7, i * 7 + 7));
+}
+
+// Odabir raspona u dva tapa. Drugi tap raniji od prvog = novi početak. Isti dan dvaput = jedan dan.
+function klikKalendar(prvi, iso) {
+  if (!prvi || iso < prvi) return { prvi: iso, gotovo: null };
+  return { prvi: null, gotovo: { od: prvi, do: iso } };
 }
 
 // Privremena navigacija (bez dizajna) — pravi donji tab-bar je Faza 6.

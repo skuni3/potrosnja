@@ -14,25 +14,29 @@
 <title>Potrošnja</title>
 <style>
   :root {
-    --bg: #f4f5f7;
-    --card: #ffffff;
-    --text: #1c1d21;
-    --muted: #8a8f98;
-    --line: #e7e9ee;
-    --track: #eceef2;
+    /* tamne, poluprozirne ljubičaste kartice preko valovite pozadine */
+    --card: rgba(34, 11, 50, .80);
+    --solid: #241030;          /* neprozirna verzija kartice (tab-bar, krug) */
+    --text: #f4edfb;
+    --muted: #b7a3cb;
+    --line: rgba(255, 255, 255, .10);
+    --track: rgba(255, 255, 255, .12);
+    --lila: #a86fd0;           /* naglasak: krug tab-bara, odabir, gumbi */
+    --lila-svijetla: #d7b8f0;
     /* status: zeleno / žuto / crveno — samo za limite i prag */
     --green: #0ca30c;
     --yellow: #fab219;
     --red: #d03b3b;
     /* kategorijske boje (donut) — boja prati kategoriju, ne rang */
-    --c-ducan: #2a78d6;
-    --c-marenda: #eb6834;
-    --c-izlasci: #1baf7a;
-    --c-cigare: #eda100;
-    --c-njega: #e87ba4;
+    /* tamne stepenice iste palete — provjerene za tamnu podlogu */
+    --c-ducan: #3987e5;
+    --c-marenda: #d95926;
+    --c-izlasci: #199e70;
+    --c-cigare: #c98500;
+    --c-njega: #d55181;
     --c-auto: #008300;
-    --c-iznimke: #4a3aa7;
-    --c-ostalo: #8a8f98;
+    --c-iznimke: #9085e9;
+    --c-ostalo: #8f8499;
     --radius: 18px;
   }
   * { box-sizing: border-box; }
@@ -51,11 +55,11 @@
   main { max-width: 520px; margin: 0 auto; }
   h1 { font-size: 22px; margin: 4px 0 16px; }
   h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-  .card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  .card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; border: 1px solid rgba(255, 255, 255, .08); box-shadow: 0 8px 24px rgba(10, 0, 20, .35); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
   .big { font-size: 40px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .muted { color: var(--muted); font-size: 13px; }
   .ok { color: var(--green); font-weight: 600; }
-  .err { color: var(--red); font-weight: 600; }
+  .err { color: #ff7a7a; font-weight: 600; } /* svjetlija crvena za tekst na tamnom */
   .kv { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
   .kv:last-child { border-bottom: 0; }
   .kv b { font-variant-numeric: tabular-nums; }
@@ -117,7 +121,7 @@
   .foot { text-align: center; margin-top: 6px; }
 
   /* ---------- GRAFOVI (funkcionalno; polish je Faza 6) ---------- */
-  :root { --axis: #c3c7cf; }
+  :root { --axis: rgba(255, 255, 255, .28); }
   .chart { width: 100%; height: auto; display: block; overflow: visible; }
   .chart .ax { font-size: 10px; fill: var(--muted); }
   .chart .ax.cur { fill: var(--text); font-weight: 700; }
@@ -133,23 +137,23 @@
   .card-head h2 { margin: 0; }
   .seg-toggle { display: inline-flex; background: var(--track); border-radius: 9px; padding: 2px; }
   .seg-toggle button { border: 0; background: transparent; font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 7px; color: var(--muted); cursor: pointer; }
-  .seg-toggle button.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .seg-toggle button.on { background: rgba(255, 255, 255, .16); color: var(--text); font-weight: 600; }
   /* ---------- CUSTOM (funkcionalno; polish je Faza 6) ---------- */
-  .raspon-btn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; font: inherit; font-size: 16px; font-weight: 600; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; text-align: left; }
-  .raspon-btn.open { border-color: #2a78d6; }
+  .raspon-btn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; font: inherit; font-size: 16px; font-weight: 600; color: var(--text); background: rgba(255, 255, 255, .06); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; text-align: left; }
+  .raspon-btn.open { border-color: var(--lila); }
   .raspon-btn .muted { font-weight: 400; margin-right: 2px; }
   #r-kal { margin-top: 12px; }
   .kal-head { display: flex; justify-content: space-between; align-items: center; }
-  .kal-nav { width: 44px; height: 44px; border: 0; background: transparent; font-size: 26px; color: #2a78d6; cursor: pointer; border-radius: 10px; }
+  .kal-nav { width: 44px; height: 44px; border: 0; background: transparent; font-size: 26px; color: var(--lila-svijetla); cursor: pointer; border-radius: 10px; }
   .kal-hint { text-align: center; font-size: 13px; color: var(--muted); margin: 2px 0 8px; }
   .kal-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; }
   .kal-grid .dow { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 4px; }
   .kal-grid .d { position: relative; height: 42px; border: 0; background: transparent; font: inherit; font-size: 16px; color: var(--text); cursor: pointer; padding: 0; }
   /* danas = samo tanka crta ispod broja, da se ne miješa s odabranim danom */
   .kal-grid .d.today { text-decoration: underline 2px var(--muted); text-underline-offset: 5px; }
-  .raspon-btn .ceka { color: #2a78d6; font-weight: 600; }
-  .kal-grid .d.in { background: #dce9fa; }
-  .kal-grid .d.end { background: #2a78d6; color: #fff; font-weight: 700; border-radius: 10px; }
+  .raspon-btn .ceka { color: var(--lila-svijetla); font-weight: 600; }
+  .kal-grid .d.in { background: rgba(168, 111, 208, .28); }
+  .kal-grid .d.end { background: #8e4fc0; color: #fff; font-weight: 700; border-radius: 10px; }
   .kal-grid .d i { position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--muted); }
   .kal-grid .d.end i { background: #fff; }
   .big-num { font-size: 52px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
@@ -159,14 +163,14 @@
   .tr-info { flex: 1; min-width: 0; }
   .tr-row b { white-space: nowrap; font-variant-numeric: tabular-nums; }
   /* ---------- DONJI TAB-BAR ---------- */
-  :root { --accent: #793c9d; --tb-h: 64px; } /* ljubičasti krug u tab-baru */
+  :root { --accent: var(--lila); --tb-h: 64px; } /* ljubičasti krug u tab-baru */
   .tabbar { position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--tb-h) + env(safe-area-inset-bottom, 0px)); display: flex; align-items: flex-start; z-index: 10; }
   .tabbar:empty { display: none; }
-  .tb-bg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: var(--card); stroke: var(--line); stroke-width: 1; filter: drop-shadow(0 -2px 10px rgba(20, 24, 40, .10)); }
-  .tb-item { position: relative; flex: 1; height: var(--tb-h); border: 0; background: none; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity .2s; }
+  .tb-bg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: var(--solid); stroke: var(--line); stroke-width: 1; filter: drop-shadow(0 -2px 12px rgba(10, 0, 20, .45)); }
+  .tb-item { position: relative; flex: 1; height: var(--tb-h); border: 0; background: none; color: #9d8ab3; display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity .2s; }
   .tb-item svg { width: 27px; height: 27px; }
   .tb-item.on { opacity: 0; pointer-events: none; }
-  .tb-bubble { position: absolute; left: 0; top: -28px; width: 56px; height: 56px; border-radius: 50%; background: var(--card); box-shadow: 0 0 0 3px var(--accent), 0 4px 12px rgba(20, 24, 40, .18); color: var(--accent); display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .tb-bubble { position: absolute; left: 0; top: -28px; width: 56px; height: 56px; border-radius: 50%; background: var(--solid); box-shadow: 0 0 0 3px var(--accent), 0 4px 14px rgba(0, 0, 0, .4); color: var(--lila-svijetla); display: flex; align-items: center; justify-content: center; pointer-events: none; }
   .tb-bubble svg { width: 26px; height: 26px; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
 </style>
@@ -608,8 +612,8 @@ function grafDnevno(dani, mod, sel) {
   const pts = tocke.map(p => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`);
   const zadnja = tocke[tocke.length - 1];
   const area = tocke.length
-    ? `<path d="M${x(tocke[0].i)},${bot}L${pts.join("L")}L${x(zadnja.i)},${bot}Z" fill="var(--c-ducan)" fill-opacity="0.16"/>
-       <polyline points="${pts.join(" ")}" fill="none" stroke="var(--c-ducan)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`
+    ? `<path d="M${x(tocke[0].i)},${bot}L${pts.join("L")}L${x(zadnja.i)},${bot}Z" fill="var(--lila-svijetla)" fill-opacity="0.22"/>
+       <polyline points="${pts.join(" ")}" fill="none" stroke="var(--lila-svijetla)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`
     : "";
   const prag = mod === "kum"
     ? `<line x1="${L}" x2="${W}" y1="${y(UKUPNI_PRAG)}" y2="${y(UKUPNI_PRAG)}" stroke="var(--red)" stroke-width="1" stroke-opacity="0.5"/>
@@ -618,8 +622,8 @@ function grafDnevno(dani, mod, sel) {
     ? `<text x="${x(i)}" y="${bot + 16}" text-anchor="middle" class="ax">${datumKratko(d.datum)}</text>` : "").join("");
   const odabir = sel != null && vr(dani[sel]) != null
     ? `<line x1="${x(sel)}" x2="${x(sel)}" y1="${top}" y2="${bot}" stroke="var(--muted)" stroke-width="1"/>
-       <circle cx="${x(sel)}" cy="${y(vr(dani[sel]))}" r="4.5" fill="var(--c-ducan)" stroke="var(--card)" stroke-width="2"/>`
-    : zadnja ? `<circle cx="${x(zadnja.i)}" cy="${y(zadnja.v)}" r="4" fill="var(--c-ducan)" stroke="var(--card)" stroke-width="2"/>` : "";
+       <circle cx="${x(sel)}" cy="${y(vr(dani[sel]))}" r="4.5" fill="var(--lila-svijetla)" stroke="var(--solid)" stroke-width="2"/>`
+    : zadnja ? `<circle cx="${x(zadnja.i)}" cy="${y(zadnja.v)}" r="4" fill="var(--lila-svijetla)" stroke="var(--solid)" stroke-width="2"/>` : "";
   const hit = dani.map((d, i) => `<rect class="hit" data-i="${i}" x="${L + i * sw}" y="0" width="${sw}" height="${bot}" fill="transparent"/>`).join("");
   return `<svg class="chart" viewBox="0 0 ${W} ${H}">${mreza(W, top, bot, max, L)}${prag}
     <line x1="${L}" x2="${W}" y1="${bot}" y2="${bot}" stroke="var(--axis)" stroke-width="1"/>${area}${osX}${odabir}${hit}</svg>`;
@@ -743,7 +747,7 @@ function grafUsporedba(u) {
   const y = v => bot - (v / max) * (bot - top);
   const grupe = kat.map((k, i) => {
     const cx = L + gw * i + gw / 2;
-    const prosli = u.prosli ? stupac(cx - bw - 1, y(k.prije), bw, bot - y(k.prije), bojaZa(k.naziv), 'fill-opacity="0.35"') : "";
+    const prosli = u.prosli ? stupac(cx - bw - 1, y(k.prije), bw, bot - y(k.prije), bojaZa(k.naziv), 'fill-opacity="0.45"') : "";
     const tekuci = stupac(u.prosli ? cx + 1 : cx - bw / 2, y(k.sada), bw, bot - y(k.sada), bojaZa(k.naziv));
     return `<g class="grp" data-i="${i}">
       <rect x="${L + gw * i}" y="0" width="${gw}" height="${H}" fill="transparent"/>
@@ -768,7 +772,7 @@ function grafPregled(niz) {
     const oznaka = niz.length <= 6 && c.imaPodatke
       ? `<text x="${cx(i)}" y="${y(c.iznos) - 10}" text-anchor="middle" class="val">${Math.round(c.iznos)}</text>` : "";
     const tijelo = c.imaPodatke
-      ? stupac(cx(i) - bw / 2, y(c.iznos), bw, bot - y(c.iznos), boja, c.uTijeku ? 'fill-opacity="0.4"' : "")
+      ? stupac(cx(i) - bw / 2, y(c.iznos), bw, bot - y(c.iznos), boja, c.uTijeku ? 'fill-opacity="0.55"' : "")
       : `<rect x="${cx(i) - bw / 2}" y="${bot - 3}" width="${bw}" height="3" rx="1.5" fill="var(--track)"/>`;
     return `<g class="grp" data-i="${i}">
       <rect x="${L + sw * i}" y="0" width="${sw}" height="${H}" fill="transparent"/>
@@ -778,7 +782,7 @@ function grafPregled(niz) {
   }).join("");
   const linija = trend.length >= 2
     ? `<polyline points="${trend.map(({ c, i }) => `${cx(i)},${y(c.iznos)}`).join(" ")}" fill="none" stroke="var(--text)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"/>` +
-      trend.map(({ c, i }) => `<circle cx="${cx(i)}" cy="${y(c.iznos)}" r="4" fill="var(--text)" stroke="var(--card)" stroke-width="2" pointer-events="none"/>`).join("")
+      trend.map(({ c, i }) => `<circle cx="${cx(i)}" cy="${y(c.iznos)}" r="4" fill="var(--text)" stroke="var(--solid)" stroke-width="2" pointer-events="none"/>`).join("")
     : "";
   const prag = `<line x1="${L}" x2="${W}" y1="${y(UKUPNI_PRAG)}" y2="${y(UKUPNI_PRAG)}" stroke="var(--red)" stroke-width="1" stroke-opacity="0.5"/>
     <text x="${W}" y="${y(UKUPNI_PRAG) - 4}" text-anchor="end" class="ax">prag ${UKUPNI_PRAG}</text>`;

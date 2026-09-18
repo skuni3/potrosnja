@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Potrošnja">
-<meta name="theme-color" content="#f4f5f7">
+<meta name="theme-color" content="#29093a">
 <meta name="format-detection" content="telephone=no">
-<link rel="apple-touch-icon" href="icon-100-180.png">
-<link rel="icon" type="image/png" href="icon-100-32.png">
+<link rel="apple-touch-icon" href="icon-333-180.png">
+<link rel="icon" type="image/png" href="icon-333-32.png">
 <title>Potrošnja</title>
 <style>
   :root {
@@ -36,7 +36,13 @@
     --radius: 18px;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  html { background: #29093a; }
+  body { margin: 0; background: transparent; color: var(--text); } /* prozirno, da se vidi .pozadina */
+  /* Valovita ljubičasta pozadina (fiksna; iOS ne podržava background-attachment: fixed) */
+  .pozadina { position: fixed; inset: 0; z-index: -1; background: #29093a url("pozadina.png") center / cover no-repeat; }
+  /* Tekst izravno na pozadini (izvan kartica) → svijetao */
+  main > h1, .top h1 { color: #fff; text-shadow: 0 1px 4px rgba(20, 0, 30, .6); }
+  .top .muted, .foot { color: rgba(255, 255, 255, .85); text-shadow: 0 1px 3px rgba(20, 0, 30, .7); }
   body {
     font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
     padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 110px); /* mjesto za tab-bar */
@@ -153,7 +159,7 @@
   .tr-info { flex: 1; min-width: 0; }
   .tr-row b { white-space: nowrap; font-variant-numeric: tabular-nums; }
   /* ---------- DONJI TAB-BAR ---------- */
-  :root { --accent: #2a78d6; --tb-h: 64px; }
+  :root { --accent: #793c9d; --tb-h: 64px; } /* ljubičasti krug u tab-baru */
   .tabbar { position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--tb-h) + env(safe-area-inset-bottom, 0px)); display: flex; align-items: flex-start; z-index: 10; }
   .tabbar:empty { display: none; }
   .tb-bg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: var(--card); stroke: var(--line); stroke-width: 1; filter: drop-shadow(0 -2px 10px rgba(20, 24, 40, .10)); }
@@ -166,6 +172,7 @@
 </style>
 </head>
 <body>
+<div class="pozadina" aria-hidden="true"></div>
 <main id="app">
   <div class="card msg muted">Učitavam…</div>
 </main>

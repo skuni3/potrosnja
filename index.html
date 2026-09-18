@@ -141,7 +141,9 @@
   .kal-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; }
   .kal-grid .dow { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 4px; }
   .kal-grid .d { position: relative; height: 42px; border: 0; background: transparent; font: inherit; font-size: 16px; color: var(--text); cursor: pointer; padding: 0; }
-  .kal-grid .d.today { font-weight: 700; }
+  /* danas = samo tanka crta ispod broja, da se ne miješa s odabranim danom */
+  .kal-grid .d.today { text-decoration: underline 2px var(--muted); text-underline-offset: 5px; }
+  .raspon-btn .ceka { color: #2a78d6; font-weight: 600; }
   .kal-grid .d.in { background: #dce9fa; }
   .kal-grid .d.end { background: #2a78d6; color: #fff; font-weight: 700; border-radius: 10px; }
   .kal-grid .d i { position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--muted); }
@@ -868,7 +870,9 @@ let raspon = null; // { od, do } — pamti se samo dok je app otvorena (bez stor
 
 function prikaziCustom(troskovi, danas) {
   // Zadano: od početka tekućeg ciklusa do danas.
-  if (!raspon) raspon = { od: uIso(ciklusZa(danas).start), do: uIso(danas) };
+  // Dok Ele ne odabere svoj raspon, zadani (auto) se računa iznova svaki put — i kad app ostane
+  // otvorena preko noći ili u novom ciklusu, "do" je uvijek današnji dan.
+  if (!raspon || raspon.auto) raspon = { od: uIso(ciklusZa(danas).start), do: uIso(danas), auto: true };
 
   document.getElementById("app").innerHTML = `
     ${nav("custom")}
@@ -928,8 +932,11 @@ function prikaziCustom(troskovi, danas) {
   const kratko = iso => { const d = parseTimestamp(iso); return `${datumKratko(d)}${d.getFullYear()}.`; };
   let prvi = null, mjesec = null;
 
+  // Gumb uvijek pokazuje ono što je trenutno odabrano — i usred odabira (nakon prvog tapa "do" još nije izabran).
   const crtajGumb = () => {
-    btn.innerHTML = `<span><span class="muted">od</span> ${kratko(raspon.od)}</span><span class="muted">→</span><span><span class="muted">do</span> ${kratko(raspon.do)}</span>`;
+    const od = prvi || raspon.od;
+    const doTekst = prvi ? `<span class="ceka">odaberi</span>` : kratko(raspon.do);
+    btn.innerHTML = `<span><span class="muted">od</span> ${kratko(od)}</span><span class="muted">→</span><span><span class="muted">do</span> ${doTekst}</span>`;
     btn.classList.toggle("open", !kalEl.hidden);
   };
   const crtajKal = () => {
@@ -966,8 +973,8 @@ function prikaziCustom(troskovi, danas) {
         raspon = r.gotovo;
         kalEl.hidden = true;
         crtaj();
-        crtajGumb();
       } else crtajKal();
+      crtajGumb();
     }));
   };
 

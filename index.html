@@ -382,6 +382,27 @@ function usporedbaCiklusa(troskovi, danas) {
   };
 }
 
+// Dnevne sume tekućeg ciklusa (spec 5.6): jedan element po danu ciklusa.
+// Dani bez troška = 0; budući dani = null (ne crtaju se). Nijedan trošak se ne gubi.
+function dnevneSume(troskovi, danas) {
+  const c = ciklusZa(danas);
+  const brojDana = danIndeks(c.end) - danIndeks(c.start);
+  const dani = Array.from({ length: brojDana }, (_, i) => ({
+    datum: new Date(c.start.getFullYear(), c.start.getMonth(), c.start.getDate() + i),
+    iznos: 0,
+  }));
+  for (const t of uRasponu(troskovi, c.start, c.end)) dani[danIndeks(t.timestamp) - danIndeks(c.start)].iznos += t.iznos;
+  // Zadnji prikazani dan = danas (ili kasniji dan ako u njemu već postoji trošak).
+  let zadnji = danIndeks(danas) - danIndeks(c.start);
+  dani.forEach((d, i) => { if (d.iznos && i > zadnji) zadnji = i; });
+  let kum = 0;
+  return dani.map((d, i) => {
+    kum += d.iznos;
+    const buduci = i > zadnji;
+    return { ...d, iznos: buduci ? null : d.iznos, kumulativno: buduci ? null : kum };
+  });
+}
+
 // "Isti dan prošlog ciklusa" = isti BROJ DANA od početka ciklusa (spec 6.3).
 // Dan N tekućeg (danas uklj.) ↔ dani 1..N prošlog; ako je prošli kraći, uzima se cijeli.
 function istiDanProslog(troskovi, danas) {
@@ -521,6 +542,66 @@ function top3(troskovi) {
     </div>`).join("");
 }
 
+const DANI_KRATKO = ["ned", "pon", "uto", "sri", "čet", "pet", "sub"];
+let modDnevno = "dan"; // "dan" | "kum" — Home se otvara "po danu" (samo u memoriji)
+
+// Area chart dnevne potrošnje (spec 5.6). Zupčasto = točno, bez izglađivanja.
+function grafDnevno(dani, mod, sel) {
+  const W = 340, H = 168, L = 30, top = 12, bot = 140;
+  const n = dani.length, sw = (W - L) / n;
+  const vr = d => mod === "kum" ? d.kumulativno : d.iznos;
+  const tocke = dani.map((d, i) => ({ i, v: vr(d) })).filter(p => p.v != null);
+  const najvise = Math.max(0, ...tocke.map(p => p.v));
+  const max = mod === "kum" ? lijepiMax(Math.max(UKUPNI_PRAG, najvise)) : lijepiMax(Math.max(10, najvise));
+  const x = i => L + (i + 0.5) * sw;
+  const y = v => bot - (v / max) * (bot - top);
+  const pts = tocke.map(p => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`);
+  const zadnja = tocke[tocke.length - 1];
+  const area = tocke.length
+    ? `<path d="M${x(tocke[0].i)},${bot}L${pts.join("L")}L${x(zadnja.i)},${bot}Z" fill="var(--c-ducan)" fill-opacity="0.16"/>
+       <polyline points="${pts.join(" ")}" fill="none" stroke="var(--c-ducan)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`
+    : "";
+  const prag = mod === "kum"
+    ? `<line x1="${L}" x2="${W}" y1="${y(UKUPNI_PRAG)}" y2="${y(UKUPNI_PRAG)}" stroke="var(--red)" stroke-width="1" stroke-opacity="0.5"/>
+       <text x="${W}" y="${y(UKUPNI_PRAG) - 4}" text-anchor="end" class="ax">prag ${UKUPNI_PRAG}</text>` : "";
+  const osX = dani.map((d, i) => i % 7 === 0
+    ? `<text x="${x(i)}" y="${bot + 16}" text-anchor="middle" class="ax">${datumKratko(d.datum)}</text>` : "").join("");
+  const odabir = sel != null && vr(dani[sel]) != null
+    ? `<line x1="${x(sel)}" x2="${x(sel)}" y1="${top}" y2="${bot}" stroke="var(--muted)" stroke-width="1"/>
+       <circle cx="${x(sel)}" cy="${y(vr(dani[sel]))}" r="4.5" fill="var(--c-ducan)" stroke="var(--card)" stroke-width="2"/>`
+    : zadnja ? `<circle cx="${x(zadnja.i)}" cy="${y(zadnja.v)}" r="4" fill="var(--c-ducan)" stroke="var(--card)" stroke-width="2"/>` : "";
+  const hit = dani.map((d, i) => `<rect class="hit" data-i="${i}" x="${L + i * sw}" y="0" width="${sw}" height="${bot}" fill="transparent"/>`).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}">${mreza(W, top, bot, max, L)}${prag}
+    <line x1="${L}" x2="${W}" y1="${bot}" y2="${bot}" stroke="var(--axis)" stroke-width="1"/>${area}${osX}${odabir}${hit}</svg>`;
+}
+
+function spojiDnevno(dani) {
+  let sel = null;
+  const dan = d => `${datumKratko(d.datum)} <span class="muted">${DANI_KRATKO[d.datum.getDay()]}</span>`;
+  const crtaj = () => {
+    document.getElementById("g-dan").innerHTML = grafDnevno(dani, modDnevno, sel);
+    const d = sel != null ? dani[sel] : null;
+    const zadnji = [...dani].reverse().find(x => x.iznos != null);
+    const najveci = dani.reduce((a, b) => (b.iznos || 0) > (a.iznos || 0) ? b : a, dani[0]);
+    document.getElementById("g-dan-d").innerHTML = d
+      ? (d.iznos == null ? `${dan(d)} · <span class="muted">još nije</span>`
+        : modDnevno === "kum" ? `do ${dan(d)}: <b>${eur(d.kumulativno)}</b>` : `${dan(d)}: <b>${eur(d.iznos)}</b>`)
+      : modDnevno === "kum"
+        ? `<span class="muted">do danas:</span> <b>${eur(zadnji ? zadnji.kumulativno : 0)}</b>`
+        : (najveci.iznos ? `<span class="muted">najviše u danu:</span> ${dan(najveci)} · <b>${eur(najveci.iznos)}</b>` : `<span class="muted">još nema troškova</span>`);
+    document.querySelectorAll("#dnevno-toggle button").forEach(b => b.classList.toggle("on", b.dataset.m === modDnevno));
+    document.querySelectorAll("#g-dan .hit").forEach(r => r.addEventListener("click", () => {
+      sel = sel === +r.dataset.i ? null : +r.dataset.i;
+      crtaj();
+    }));
+  };
+  document.querySelectorAll("#dnevno-toggle button").forEach(b => b.addEventListener("click", () => {
+    modDnevno = b.dataset.m;
+    crtaj();
+  }));
+  crtaj();
+}
+
 // HOME — spec 5
 function prikaziHome(troskovi, danas) {
   const c = ciklusZa(danas);
@@ -544,6 +625,18 @@ function prikaziHome(troskovi, danas) {
     </div>
 
     <div class="card">
+      <div class="card-head">
+        <h2>Kroz ciklus</h2>
+        <div class="seg-toggle" id="dnevno-toggle">
+          <button data-m="dan">Po danu</button>
+          <button data-m="kum">Kumulativno</button>
+        </div>
+      </div>
+      <div id="g-dan"></div>
+      <div class="detail" id="g-dan-d"></div>
+    </div>
+
+    <div class="card">
       <h2>Kategorije</h2>
       ${barovi(kategorije)}
     </div>
@@ -561,6 +654,7 @@ function prikaziHome(troskovi, danas) {
     <p class="muted foot">ažurirano ${String(sad.getHours()).padStart(2, "0")}:${String(sad.getMinutes()).padStart(2, "0")}</p>
   `;
   if (d) d.spoji();
+  spojiDnevno(dnevneSume(troskovi, danas));
 }
 
 // ---------- GRAFOVI (spec 6) ----------
@@ -807,6 +901,13 @@ function prikaziDokaz(troskovi, preskoceno, danas) {
       <div class="kv"><span>Proteklo dana (uklj. danas)</span><b>${proteklo}</b></div>
       <div class="kv"><span>Preostalo dana (od sutra)</span><b>${preostaloDana(c, danas)}</b></div>
       <div class="kv"><span>Prosjek po danu</span><b>~${eur(ukupnoCiklus / proteklo)}/dan</b></div>
+      ${(() => {
+        const dani = dnevneSume(troskovi, danas);
+        const zbrojDana = dani.reduce((s, d) => s + (d.iznos || 0), 0);
+        const kum = [...dani].reverse().find(d => d.kumulativno != null)?.kumulativno ?? 0;
+        const ok = Math.abs(zbrojDana - ukupnoCiklus) < 1e-9 && Math.abs(kum - ukupnoCiklus) < 1e-9;
+        return `<div class="kv"><span>Faza 4.5 · zbroj dnevnih = krug</span><b class="${ok ? "ok" : "err"}">${tocno(zbrojDana)} · kum. ${tocno(kum)} ${ok ? "✓" : "✗"}</b></div>`;
+      })()}
     </div>
 
     <div class="card">

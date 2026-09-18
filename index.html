@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Potrošnja">
+<meta name="theme-color" content="#f4f5f7">
+<meta name="format-detection" content="telephone=no">
+<title>Potrošnja</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1c1d21;
+    --muted: #8a8f98;
+    --line: #e7e9ee;
+    --track: #eceef2;
+    /* status: zeleno / žuto / crveno — samo za limite i prag */
+    --green: #0ca30c;
+    --yellow: #fab219;
+    --red: #d03b3b;
+    /* kategorijske boje (donut) — boja prati kategoriju, ne rang */
+    --c-ducan: #2a78d6;
+    --c-marenda: #eb6834;
+    --c-izlasci: #1baf7a;
+    --c-cigare: #eda100;
+    --c-njega: #e87ba4;
+    --c-auto: #008300;
+    --c-iznimke: #4a3aa7;
+    --c-ostalo: #8a8f98;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+    -webkit-text-size-adjust: 100%;
+  }
+  main { max-width: 520px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 4px 0 16px; }
+  h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  .big { font-size: 40px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .ok { color: var(--green); font-weight: 600; }
+  .err { color: var(--red); font-weight: 600; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .kv:last-child { border-bottom: 0; }
+  .kv b { font-variant-numeric: tabular-nums; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.opis { white-space: normal; }
+  .msg { text-align: center; padding: 32px 16px; }
+
+  /* ---------- HOME ---------- */
+  .top { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 2px 12px; }
+  .top h1 { margin: 0; }
+
+  .hero { text-align: center; padding: 24px 16px 20px; }
+  .ring { position: relative; width: 220px; max-width: 70vw; aspect-ratio: 1; margin: 0 auto; }
+  .ring svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+  .ring .fill { transition: stroke-dashoffset .8s ease, stroke .3s; }
+  .ring .val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .ring .num { font-size: 60px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .ring .num small { font-size: 24px; font-weight: 600; color: var(--muted); margin-left: 2px; }
+  .ring .num.preko, .ring .num.preko small { color: var(--red); }
+  .sub { margin-top: 14px; color: var(--muted); font-size: 13px; }
+
+  .bar-row { padding: 9px 0; }
+  .bar-row + .bar-row { border-top: 1px solid var(--line); }
+  .bar-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .bar-head .n { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .bar-head:last-child { margin-bottom: 0; }
+  .bar-head .n span { color: var(--muted); font-weight: 400; }
+  .bar { height: 10px; border-radius: 5px; background: var(--track); overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 5px; min-width: 0; }
+  .s-ok { background: var(--green); }
+  .s-warn { background: var(--yellow); }
+  .s-over { background: var(--red); }
+  .flag { color: var(--red); font-weight: 700; margin-left: 4px; }
+
+  .donut-wrap { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: center; }
+  .donut { position: relative; width: 170px; aspect-ratio: 1; flex: none; }
+  .donut svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+  .donut circle.seg { cursor: pointer; transition: opacity .2s; }
+  .donut.has-sel circle.seg:not(.sel) { opacity: .25; }
+  .donut .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; }
+  .donut .center b { font-size: 22px; }
+  .legend { flex: 1 1 180px; min-width: 0; }
+  .legend .li { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; cursor: pointer; }
+  .legend .li.sel { background: var(--track); }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .legend .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend .pc { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .legend .eu { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; width: 48px; text-align: right; }
+
+  .top3 { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+  .top3 + .top3 { border-top: 1px solid var(--line); }
+  .top3 .rank { width: 26px; height: 26px; border-radius: 50%; background: var(--track); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: var(--muted); flex: none; }
+  .top3 .info { flex: 1; min-width: 0; }
+  .top3 .info .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top3 .amt { font-size: 20px; font-weight: 700; white-space: nowrap; }
+  .foot { text-align: center; margin-top: 6px; }
+</style>
+</head>
+<body>
+<main id="app">
+  <div class="card msg muted">Učitavam…</div>
+</main>
+
+<script>
+// ============================================================
+// KONFIGURACIJA — Ele mijenja ovdje
+// ============================================================
+
+// Google Sheet → File → Share → Publish to web → CSV
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSjVjLOQgPTtVtjINVAtvRr2F-iacKL2Nc3NlsTY7Z1CO-ao3eL6eFPN0ofGHk9_tIyIsQV2Eaw8HCD/pub?output=csv";
+
+// naziv = SAMO tekst (za matchanje, bez emojija). emoji = zasebno, samo za prikaz.
+const KATEGORIJE = [
+  { naziv: "Dućan",    emoji: "🛒", limit: 250 },
+  { naziv: "Marenda",  emoji: "🍔", limit: 110 },
+  { naziv: "Izlasci",  emoji: "🎉", limit: 200 },
+  { naziv: "Cigare",   emoji: "🚬", limit: 120 },
+  { naziv: "Njega",    emoji: "💈", limit: 80  },
+  { naziv: "Auto",     emoji: "🚗", limit: 50  },  // placeholder dok Ele ne vozi — koregirati kod kupnje auta
+  { naziv: "Iznimke",  emoji: "🚨", limit: null } // bez limita — nepredvidivo
+];
+
+const UKUPNI_PRAG = 1000; // mjesečni raspoloživi novac
+
+// Sigurnosna mreža: kategorija iz Sheeta koje nema gore (npr. typo u Shortcutu).
+// Broji se u ukupno, bez limita — nijedan trošak se ne baca van.
+const OSTALO = { naziv: "Ostalo", emoji: "❔", limit: null };
+
+const DAN_CIKLUSA = 8; // ciklus 8. → 8. (kraj isključiv)
+
+// ============================================================
+// PODACI — fetch + parse
+// ============================================================
+
+// CSV parser (RFC 4180): navodnici, "" unutar navodnika, zarez u polju, CRLF/LF.
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else quoted = false;
+      } else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); rows.push(row); row = []; field = "";
+    } else field += c;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+// "Dućan 🛒" → "Dućan": skini sve što nije slovo/broj s početka i kraja (spec 3.1).
+function ocistiKategoriju(s) {
+  return String(s || "").normalize("NFC").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+}
+
+function nadjiKategoriju(sirova) {
+  const cista = ocistiKategoriju(sirova).toLocaleLowerCase("hr");
+  return KATEGORIJE.find(k => k.naziv.normalize("NFC").toLocaleLowerCase("hr") === cista) || OSTALO;
+}
+
+// "2026-09-18 8:49" ili "2026-09-18 08:49" → Date u lokalnom vremenu (Europe/Zagreb na telefonu).
+function parseTimestamp(s) {
+  const m = String(s || "").trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (!m) return null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0));
+  return isNaN(d) ? null : d;
+}
+
+// "7.5" → 7.5; "#NUM!", "" → null
+function parseIznos(s) {
+  const t = String(s || "").trim().replace(/\s/g, "").replace(",", ".");
+  return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null;
+}
+
+// Sirovi CSV → { troskovi, preskoceno }. Stupci: timestamp, iznos, kategorija, dan, opis.
+function ucitajTroskove(csvText) {
+  const redovi = parseCSV(csvText.replace(/^﻿/, "")).slice(1); // prvi red = zaglavlje
+  const troskovi = [], preskoceno = [];
+  for (const r of redovi) {
+    if (r.every(f => f.trim() === "")) continue; // potpuno prazan red — nije trošak
+    const datum = parseTimestamp(r[0]);
+    const iznos = parseIznos(r[1]);
+    if (!datum || iznos === null) { preskoceno.push(r); continue; }
+    const kat = nadjiKategoriju(r[2]);
+    troskovi.push({
+      timestamp: datum,
+      iznos,
+      kategorija: kat.naziv,
+      kategorijaSirova: (r[2] || "").trim(),
+      dan: (r[3] || "").trim(),
+      opis: (r[4] || "").trim(),
+    });
+  }
+  troskovi.sort((a, b) => a.timestamp - b.timestamp);
+  return { troskovi, preskoceno };
+}
+
+async function dohvatiCSV() {
+  const url = CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "_=" + Date.now();
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.text();
+}
+
+// ============================================================
+// LOGIKA CIKLUSA (spec 4) — sve uživo iz sirovih podataka
+// ============================================================
+
+// Ciklus koji sadrži zadani datum: { start, end } s krajem ISKLJUČIVIM.
+function ciklusZa(datum) {
+  const y = datum.getFullYear(), m = datum.getMonth();
+  const mStart = datum.getDate() >= DAN_CIKLUSA ? m : m - 1; // Date sam preliva mjesec/godinu
+  return { start: new Date(y, mStart, DAN_CIKLUSA), end: new Date(y, mStart + 1, DAN_CIKLUSA) };
+}
+
+function prethodniCiklus(c) {
+  return ciklusZa(new Date(c.start.getFullYear(), c.start.getMonth(), c.start.getDate() - 1));
+}
+
+function sljedeciCiklus(c) {
+  return ciklusZa(c.end);
+}
+
+function uRasponu(troskovi, start, end) {
+  return troskovi.filter(t => t.timestamp >= start && t.timestamp < end);
+}
+
+// Redni broj kalendarskog dana (neovisno o ljetnom/zimskom vremenu).
+function danIndeks(d) {
+  return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+}
+
+// Proteklo: danas UKLJUČEN (prvi dan ciklusa = 1).
+function protekloDana(c, danas) {
+  return danIndeks(danas) - danIndeks(c.start) + 1;
+}
+
+// Preostalo: od sutra do zadnjeg dana ciklusa (8. sljedećeg NIJE u ciklusu).
+function preostaloDana(c, danas) {
+  return danIndeks(c.end) - danIndeks(danas) - 1;
+}
+
+const MJESECI = ["Siječanj", "Veljača", "Ožujak", "Travanj", "Svibanj", "Lipanj",
+                 "Srpanj", "Kolovoz", "Rujan", "Listopad", "Studeni", "Prosinac"];
+
+function oznakaCiklusa(c) {
+  return MJESECI[c.start.getMonth()] + " " + c.start.getFullYear();
+}
+
+// Svi ciklusi od najstarijeg troška do ciklusa koji sadrži `danas`.
+function sviCiklusi(troskovi, danas) {
+  const zadnji = ciklusZa(danas);
+  let c = troskovi.length ? ciklusZa(troskovi[0].timestamp) : zadnji;
+  const out = [];
+  while (c.start <= zadnji.start) { out.push(c); c = sljedeciCiklus(c); }
+  return out;
+}
+
+function zbroj(troskovi) {
+  return troskovi.reduce((s, t) => s + t.iznos, 0);
+}
+
+function poKategoriji(troskovi) {
+  const sve = [...KATEGORIJE, OSTALO];
+  return sve.map(k => {
+    const t = troskovi.filter(x => x.kategorija === k.naziv);
+    return { ...k, iznos: zbroj(t), broj: t.length };
+  }).filter(k => k.naziv !== OSTALO.naziv || k.broj > 0); // Ostalo samo ako ga ima
+}
+
+const PRAG_ZUTO = 0.8; // od 80 % limita/praga → žuto
+
+// Status prema limitu: "ok" (<80 %), "warn" (80–100 %), "over" (≥100 %), "none" (bez limita).
+function statusLimita(iznos, limit) {
+  if (limit == null) return "none";
+  const p = iznos / limit;
+  return p >= 1 ? "over" : p >= PRAG_ZUTO ? "warn" : "ok";
+}
+
+// Ukupno prema UKUPNI_PRAG: crveno tek kad PREĐE prag.
+function statusUkupno(iznos) {
+  const p = iznos / UKUPNI_PRAG;
+  return p > 1 ? "over" : p >= PRAG_ZUTO ? "warn" : "ok";
+}
+
+// Najveći pojedinačni troškovi; kod istog iznosa noviji ide prvi.
+function topTroskovi(troskovi, n) {
+  return troskovi.slice().sort((a, b) => b.iznos - a.iznos || b.timestamp - a.timestamp).slice(0, n);
+}
+
+// ============================================================
+// PRIKAZ
+// ============================================================
+
+const eur = n => Math.round(n).toLocaleString("hr-HR") + " €";
+const tocno = n => n.toLocaleString("hr-HR", { maximumFractionDigits: 2 }) + " €";
+const datumKratko = d => d.getDate() + "." + (d.getMonth() + 1) + ".";
+const datumVrijeme = d => datumKratko(d) + d.getFullYear() + ". " +
+  String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const emojiZa = naziv => ([...KATEGORIJE, OSTALO].find(k => k.naziv === naziv) || OSTALO).emoji;
+
+// ?danas=2026-10-03 — samo za testiranje logike ciklusa na drugom datumu.
+function danasnjiDatum() {
+  const p = new URLSearchParams(location.search).get("danas");
+  const d = p && parseTimestamp(p);
+  const now = new Date();
+  return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate(), now.getHours(), now.getMinutes()) : now;
+}
+
+const BOJE = {
+  "Dućan": "var(--c-ducan)", "Marenda": "var(--c-marenda)", "Izlasci": "var(--c-izlasci)",
+  "Cigare": "var(--c-cigare)", "Njega": "var(--c-njega)", "Auto": "var(--c-auto)",
+  "Iznimke": "var(--c-iznimke)", "Ostalo": "var(--c-ostalo)",
+};
+const bojaZa = naziv => BOJE[naziv] || "var(--c-ostalo)";
+
+// 1 dan, 2 dana, 5 dana, 21 dan, 11 dana
+const dana = n => n + (n % 10 === 1 && n % 100 !== 11 ? " dan" : " dana");
+
+function krug(ukupno) {
+  const r = 88, C = 2 * Math.PI * r;
+  const p = Math.min(ukupno / UKUPNI_PRAG, 1);
+  const boja = { ok: "var(--green)", warn: "var(--yellow)", over: "var(--red)" }[statusUkupno(ukupno)];
+  return `
+    <div class="ring" role="img" aria-label="Potrošeno ${eur(ukupno)}">
+      <svg viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="${r}" fill="none" stroke="var(--track)" stroke-width="16"/>
+        <circle class="fill" cx="100" cy="100" r="${r}" fill="none" stroke="${boja}" stroke-width="16"
+          stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${p > 0 ? C * (1 - p) : C}"
+          ${p === 0 ? 'stroke-opacity="0"' : ""}/>
+      </svg>
+      <div class="val"><div class="num ${statusUkupno(ukupno) === "over" ? "preko" : ""}">${Math.round(ukupno).toLocaleString("hr-HR")}<small>€</small></div></div>
+    </div>`;
+}
+
+function barovi(kategorije) {
+  return kategorije.map(k => {
+    // Bez limita (Iznimke/Ostalo): samo broj, bez bara — nema limita koji bi se "punio".
+    if (k.limit == null) return `
+      <div class="bar-row">
+        <div class="bar-head"><span>${k.emoji} ${esc(k.naziv)}</span><span class="n">${Math.round(k.iznos)}</span></div>
+      </div>`;
+    const s = statusLimita(k.iznos, k.limit);
+    return `
+      <div class="bar-row">
+        <div class="bar-head"><span>${k.emoji} ${esc(k.naziv)}</span><span class="n">${Math.round(k.iznos)}<span>/${k.limit}</span>${s === "over" ? '<span class="flag" aria-label="prešao limit">!</span>' : ""}</span></div>
+        <div class="bar"><i class="s-${s}" style="width:${(Math.min(k.iznos / k.limit, 1) * 100).toFixed(1)}%"></i></div>
+      </div>`;
+  }).join("");
+}
+
+function donut(kategorije, ukupno) {
+  const dijelovi = kategorije.filter(k => k.iznos > 0).sort((a, b) => b.iznos - a.iznos);
+  const r = 60, C = 2 * Math.PI * r, gap = dijelovi.length > 1 ? 2 : 0;
+  let pomak = 0;
+  const seg = dijelovi.map((k, i) => {
+    const duz = (k.iznos / ukupno) * C;
+    const s = `<circle class="seg" data-i="${i}" cx="80" cy="80" r="${r}" fill="none" stroke="${bojaZa(k.naziv)}" stroke-width="22"
+      stroke-dasharray="${Math.max(duz - gap, 0.5)} ${C}" stroke-dashoffset="${-pomak}"/>`;
+    pomak += duz;
+    return s;
+  }).join("");
+  const postotak = k => Math.round((k.iznos / ukupno) * 100) + " %";
+  const legenda = dijelovi.map((k, i) => `
+    <div class="li" data-i="${i}">
+      <span class="sw" style="background:${bojaZa(k.naziv)}"></span>
+      <span class="nm">${k.emoji} ${esc(k.naziv)}</span>
+      <span class="pc">${postotak(k)}</span>
+      <span class="eu">${eur(k.iznos)}</span>
+    </div>`).join("");
+  return {
+    html: `
+      <div class="donut-wrap">
+        <div class="donut" id="donut">
+          <svg viewBox="0 0 160 160">${seg}</svg>
+          <div class="center" id="donut-c"></div>
+        </div>
+        <div class="legend" id="legend">${legenda}</div>
+      </div>`,
+    // Tap na segment ili red legende → sredina pokaže tu kategoriju; ponovni tap → ukupno.
+    spoji() {
+      const d = document.getElementById("donut"), c = document.getElementById("donut-c");
+      let sel = null;
+      const prikazi = () => {
+        const k = dijelovi[sel];
+        c.innerHTML = k
+          ? `<span class="muted">${k.emoji} ${esc(k.naziv)}</span><b>${postotak(k)}</b><span class="muted">${eur(k.iznos)}</span>`
+          : `<span class="muted">ukupno</span><b>${eur(ukupno)}</b>`;
+        d.classList.toggle("has-sel", k != null);
+        document.querySelectorAll("#donut .seg, #legend .li").forEach(el => el.classList.toggle("sel", +el.dataset.i === sel));
+      };
+      document.querySelectorAll("#donut .seg, #legend .li").forEach(el => el.addEventListener("click", () => {
+        sel = sel === +el.dataset.i ? null : +el.dataset.i;
+        prikazi();
+      }));
+      prikazi();
+    },
+  };
+}
+
+function top3(troskovi) {
+  return topTroskovi(troskovi, 3).map((t, i) => `
+    <div class="top3">
+      <div class="rank">${i + 1}</div>
+      <div class="info">
+        <div>${emojiZa(t.kategorija)} ${esc(t.kategorija)}${t.opis ? ` · ${esc(t.opis)}` : ""}</div>
+        <div class="muted">${datumKratko(t.timestamp)}</div>
+      </div>
+      <div class="amt">${eur(t.iznos)}</div>
+    </div>`).join("");
+}
+
+// HOME — spec 5
+function prikaziHome(troskovi, danas) {
+  const c = ciklusZa(danas);
+  const uCiklusu = uRasponu(troskovi, c.start, c.end);
+  const ukupno = zbroj(uCiklusu);
+  const preostalo = preostaloDana(c, danas);
+  const kategorije = poKategoriji(uCiklusu);
+  const d = uCiklusu.length ? donut(kategorije, ukupno) : null;
+  const sad = new Date();
+
+  document.getElementById("app").innerHTML = `
+    <div class="top">
+      <h1>${oznakaCiklusa(c)}</h1>
+      <span class="muted">${datumKratko(c.start)} – ${datumKratko(new Date(c.end.getFullYear(), c.end.getMonth(), c.end.getDate() - 1))}</span>
+    </div>
+
+    <div class="card hero">
+      ${krug(ukupno)}
+      <div class="sub">${preostalo > 0 ? "preostalo " + dana(preostalo) : "zadnji dan ciklusa"} · ~${eur(ukupno / protekloDana(c, danas))}/dan</div>
+    </div>
+
+    <div class="card">
+      <h2>Kategorije</h2>
+      ${barovi(kategorije)}
+    </div>
+
+    <div class="card">
+      <h2>Raspodjela</h2>
+      ${d ? d.html : '<p class="muted">Još nema troškova u ovom ciklusu.</p>'}
+    </div>
+
+    <div class="card">
+      <h2>Top 3 troška</h2>
+      ${uCiklusu.length ? top3(uCiklusu) : '<p class="muted">Još nema troškova u ovom ciklusu.</p>'}
+    </div>
+
+    <p class="muted foot">ažurirano ${String(sad.getHours()).padStart(2, "0")}:${String(sad.getMinutes()).padStart(2, "0")}</p>
+  `;
+  if (d) d.spoji();
+}
+
+function poruka(tekst, detalj) {
+  document.getElementById("app").innerHTML =
+    `<div class="card msg"><div class="err">${esc(tekst)}</div>${detalj ? `<p class="muted">${esc(detalj)}</p>` : ""}</div>`;
+}
+
+function redTroska(t) {
+  return `<tr><td>${datumVrijeme(t.timestamp)}</td><td class="num">${tocno(t.iznos)}</td>` +
+    `<td>${emojiZa(t.kategorija)} ${esc(t.kategorija)}</td><td class="opis">${esc(t.opis) || '<span class="muted">—</span>'}</td></tr>`;
+}
+
+function tablicaTroskova(lista) {
+  return `<div class="table-wrap"><table><tr><th>Vrijeme</th><th class="num">Iznos</th><th>Kategorija</th><th>Opis</th></tr>` +
+    lista.map(redTroska).join("") + `</table></div>`;
+}
+
+// DOKAZ za Faze 1–2: ispis učitanih podataka i tekućeg ciklusa.
+function prikaziDokaz(troskovi, preskoceno, danas) {
+  const ukupno = zbroj(troskovi);
+  const c = ciklusZa(danas);
+  const uCiklusu = uRasponu(troskovi, c.start, c.end);
+  const ukupnoCiklus = zbroj(uCiklusu);
+  const proteklo = protekloDana(c, danas);
+  const ciklusi = sviCiklusi(troskovi, danas);
+  const zbrojCiklusa = ciklusi.reduce((s, x) => s + zbroj(uRasponu(troskovi, x.start, x.end)), 0);
+  const izvanCiklusa = troskovi.length - ciklusi.reduce((s, x) => s + uRasponu(troskovi, x.start, x.end).length, 0);
+  const zadnjiDan = new Date(c.end.getFullYear(), c.end.getMonth(), c.end.getDate() - 1);
+  const nepoznate = [...new Set(troskovi.filter(t => t.kategorija === OSTALO.naziv).map(t => t.kategorijaSirova))];
+
+  document.getElementById("app").innerHTML = `
+    <h1>Potrošnja — dokaz čitanja</h1>
+
+    <div class="card">
+      <h2>Faza 1 · Podaci iz Sheeta</h2>
+      <div class="kv"><span>Učitano troškova</span><b>${troskovi.length}</b></div>
+      <div class="kv"><span>Preskočeno (loš iznos/datum)</span><b class="${preskoceno.length ? "err" : ""}">${preskoceno.length}</b></div>
+      <div class="kv"><span>Ukupno (točno)</span><b>${tocno(ukupno)}</b></div>
+      <div class="kv"><span>Ukupno (prikaz)</span><b>${eur(ukupno)}</b></div>
+      <div class="kv"><span>Nepoznate kategorije → Ostalo</span><b class="${nepoznate.length ? "err" : "ok"}">${nepoznate.length ? esc(nepoznate.join(", ")) : "nema ✓"}</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Po kategoriji (sve)</h2>
+      ${poKategoriji(troskovi).map(k =>
+        `<div class="kv"><span>${k.emoji} ${esc(k.naziv)} <span class="muted">· ${k.broj} kom</span></span><b>${tocno(k.iznos)}</b></div>`).join("")}
+    </div>
+
+    <div class="card">
+      <h2>Prvih 5</h2>
+      ${tablicaTroskova(troskovi.slice(0, 5))}
+    </div>
+    <div class="card">
+      <h2>Zadnjih 5</h2>
+      ${tablicaTroskova(troskovi.slice(-5))}
+    </div>
+    ${preskoceno.length ? `<div class="card"><h2>Preskočeni redovi</h2>
+      ${preskoceno.map(r => `<div class="muted">${esc(r.join(" | "))}</div>`).join("")}</div>` : ""}
+
+    <div class="card">
+      <h2>Faza 2 · Tekući ciklus</h2>
+      <div class="big">${eur(ukupnoCiklus)}</div>
+      <div class="muted">${oznakaCiklusa(c)} · ${uCiklusu.length} troškova · točno ${tocno(ukupnoCiklus)}</div>
+      <div style="height:10px"></div>
+      <div class="kv"><span>Danas</span><b>${datumKratko(danas)}${danas.getFullYear()}.</b></div>
+      <div class="kv"><span>Raspon</span><b>${datumKratko(c.start)} – ${datumKratko(zadnjiDan)} <span class="muted">(${datumKratko(c.end)} isključiv)</span></b></div>
+      <div class="kv"><span>Proteklo dana (uklj. danas)</span><b>${proteklo}</b></div>
+      <div class="kv"><span>Preostalo dana (od sutra)</span><b>${preostaloDana(c, danas)}</b></div>
+      <div class="kv"><span>Prosjek po danu</span><b>~${eur(ukupnoCiklus / proteklo)}/dan</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Svi ciklusi (rekonstrukcija)</h2>
+      ${ciklusi.slice().reverse().map(x => {
+        const t = uRasponu(troskovi, x.start, x.end);
+        return `<div class="kv"><span>${oznakaCiklusa(x)} <span class="muted">${datumKratko(x.start)}–${datumKratko(x.end)}</span></span><b>${eur(zbroj(t))} <span class="muted">· ${t.length} kom</span></b></div>`;
+      }).join("")}
+      <div class="kv"><span>Kontrola: zbroj ciklusa = ukupno</span>
+        <b class="${Math.abs(zbrojCiklusa - ukupno) < 1e-9 && izvanCiklusa === 0 ? "ok" : "err"}">${tocno(zbrojCiklusa)} ${Math.abs(zbrojCiklusa - ukupno) < 1e-9 && izvanCiklusa === 0 ? "✓" : `✗ (${izvanCiklusa} izvan)`}</b></div>
+    </div>
+
+    <p class="muted" style="text-align:center">Test drugog datuma: <code>?debug=1&amp;danas=2026-10-03</code> · Home: makni <code>debug=1</code></p>
+  `;
+}
+
+async function start() {
+  let tekst;
+  try {
+    tekst = await dohvatiCSV();
+  } catch (e) {
+    return poruka("Ne mogu dohvatiti podatke iz Sheeta.", "Provjeri internet vezu i pokušaj ponovno. (" + e.message + ")");
+  }
+  try {
+    const { troskovi, preskoceno } = ucitajTroskove(tekst);
+    if (!troskovi.length) return poruka("Još nema troškova u Sheetu.", preskoceno.length ? `Preskočeno ${preskoceno.length} neispravnih redova.` : "");
+    // ?debug=1 → ispis za provjeru čitanja i ciklusa (Faze 1–2)
+    if (new URLSearchParams(location.search).has("debug")) prikaziDokaz(troskovi, preskoceno, danasnjiDatum());
+    else prikaziHome(troskovi, danasnjiDatum());
+  } catch (e) {
+    poruka("Greška pri obradi podataka.", e.message);
+  }
+}
+
+if (typeof document !== "undefined") {
+  start();
+  // Home-screen app na iOS-u se ne učitava ponovno pri povratku — osvježi podatke kad se vrati u prvi plan.
+  let skriveno = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) skriveno = Date.now();
+    else if (skriveno && Date.now() - skriveno > 60000) start();
+  });
+}
+</script>
+</body>
+</html>
